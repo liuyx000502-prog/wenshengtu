@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>文生图参考图池</title>
+<style>
+  :root{--bg:#141311;--panel:#1d1b18;--line:#35312b;--ink:#ece7dd;--dim:#a89f8f;--gold:#c9a45c;--chip:#26231f}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif;-webkit-font-smoothing:antialiased}
+  header{padding:22px 16px 10px;max-width:1200px;margin:0 auto}
+  h1{font-size:22px;letter-spacing:.12em;font-weight:600}
+  .sub{color:var(--dim);font-size:13px;margin-top:6px;line-height:1.6}
+  main{max-width:1200px;margin:0 auto;padding:6px 16px 60px}
+  .bar{position:sticky;top:0;background:var(--bg);z-index:5;padding:10px 0 8px;border-bottom:1px solid var(--line)}
+  .rowlabel{font-size:12px;color:var(--dim);margin:8px 0 6px;letter-spacing:.2em}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{background:var(--chip);border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer;user-select:none}
+  .chip.on{background:var(--gold);border-color:var(--gold);color:#171410;font-weight:600}
+  .chip .n{opacity:.65;font-size:11px;margin-left:4px}
+  .swatch{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;border:1px solid rgba(255,255,255,.35);vertical-align:-1px}
+  .tools{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  input[type=search]{flex:1;min-width:160px;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:8px 12px;font-size:14px}
+  button.act{background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer}
+  button.act:hover{color:var(--ink);border-color:var(--dim)}
+  .status{color:var(--dim);font-size:13px;margin:14px 0 4px}
+  .fold{border:1px solid var(--line);border-radius:10px;margin:10px 0;background:var(--panel);overflow:hidden}
+  .foldhead{width:100%;text-align:left;background:transparent;border:0;color:var(--ink);padding:13px 16px;font-size:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .foldhead .cnt{color:var(--dim);font-size:13px;white-space:nowrap}
+  .foldhead .arrow{color:var(--gold);font-size:13px}
+  .foldbody{padding:2px 12px 14px}
+  .foldbody .fold{margin:8px 0}
+  .lv2>.foldhead{font-size:15px}
+  .lv3>.foldhead{font-size:14px}
+  .gdesc{color:var(--dim);font-size:13px;line-height:1.7;padding:0 6px 10px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  @media(min-width:760px){.grid{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}}
+  .card{cursor:pointer;border-radius:8px;overflow:hidden;background:#000;border:1px solid var(--line)}
+  .card img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
+  .card .t{font-size:13px;padding:7px 9px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .empty{color:var(--dim);padding:30px 0;text-align:center;font-size:14px}
+  #overlay{position:fixed;inset:0;background:rgba(8,7,6,.94);z-index:50;display:none;overflow-y:auto}
+  #overlay.open{display:block}
+  .ovwrap{max-width:860px;margin:0 auto;padding:18px 16px 50px}
+  .ovimg{width:100%;border-radius:10px;display:block}
+  .ovnav{display:flex;justify-content:space-between;align-items:center;margin:12px 0}
+  .ovnav button{background:var(--chip);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 16px;font-size:14px;cursor:pointer}
+  .ovpos{color:var(--dim);font-size:13px}
+  .ovtitle{font-size:20px;margin:8px 0 4px}
+  .ovstyle{color:var(--gold);font-size:13px;margin-bottom:12px;line-height:1.6}
+  .field{margin:10px 0}
+  .field .k{color:var(--dim);font-size:12px;letter-spacing:.18em;margin-bottom:3px}
+  .field .v{font-size:14px;line-height:1.75}
+  .tagchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  .tagchips span{background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px;color:var(--ink)}
+  .closebar{position:sticky;top:0;display:flex;justify-content:flex-end;padding:8px 0}
+  .closebar button{background:var(--chip);border:1px solid var(--line);color:var(--ink);border-radius:50%;width:38px;height:38px;font-size:17px;cursor:pointer}
+  footer{max-width:1200px;margin:0 auto;padding:0 16px 40px;color:var(--dim);font-size:12px;line-height:1.7}
+</style>
+</head>
+<body>
+<header>
+  <h1>文生图参考图池</h1>
+  <div class="sub" id="subtitle">加载中…</div>
+</header>
+<main>
+  <div class="bar">
+    <div id="cascade"></div>
+    <div id="tagfilters"></div>
+    <div class="tools">
+      <input type="search" id="q" placeholder="按标题搜索…">
+      <button class="act" id="clearBtn">清除筛选</button>
+    </div>
+  </div>
+  <div class="status" id="status"></div>
+  <div id="content"></div>
+</main>
+<footer>只读展示：可以浏览、筛选、看详情，不能上传或存入图片。图片版权归原作者所有，仅作学习参考。</footer>
+
+<div id="overlay">
+  <div class="ovwrap">
+    <div class="closebar"><button id="ovClose" aria-label="关闭">✕</button></div>
+    <img class="ovimg" id="ovImg" alt="">
+    <div class="ovnav">
+      <button id="ovPrev">← 上一张</button>
+      <span class="ovpos" id="ovPos"></span>
+      <button id="ovNext">下一张 →</button>
+    </div>
+    <div class="ovtitle" id="ovTitle"></div>
+    <div class="ovstyle" id="ovStyle"></div>
+    <div id="ovFields"></div>
+  </div>
+</div>
+
+<script>
+const SWATCH={黑:"#111",白:"#f2f2f2",灰:"#8a8a8a",金:"#c9a45c",银:"#c8ccd2",红:"#c93a2e",橙:"#e07b2a",黄:"#e3c832",绿:"#4d8f4a",青:"#3fa8a0",蓝:"#3a6bc9",粉:"#e59bb8",褐:"#7d5a3c"};
+let DATA=null, refsById={}, groupsById={}, catsById={};
+let selTop=null, selStyle=null, tagSel=new Set(), colorSel=new Set(), query="";
+let expanded=new Set(); let tagsOpen=false;
+let currentList=[], curIdx=0;
+
+function $(id){return document.getElementById(id)}
+function refCount(pred){return DATA.refs.filter(pred).length}
+function catRefCount(catId){
+  const gids=new Set(DATA.groups.filter(g=>g.category_id===catId).map(g=>g.id));
+  const subIds=DATA.categories.filter(c=>c.parent_id===catId).map(c=>c.id);
+  subIds.forEach(sid=>DATA.groups.filter(g=>g.category_id===sid).forEach(g=>gids.add(g.id)));
+  return DATA.refs.filter(r=>gids.has(r.group_id)).length;
+}
+function filtering(){return selTop||selStyle||tagSel.size||colorSel.size||query}
+function matchRef(r){
+  if(selStyle){const g=groupsById[r.group_id]; if(!g||g.category_id!==selStyle) return false}
+  else if(selTop){
+    const g=groupsById[r.group_id]; if(!g) return false;
+    if(g.category_id!==selTop){const c=catsById[g.category_id]; if(!c||c.parent_id!==selTop) return false}
+  }
+  for(const t of tagSel){ if(!r.tags.includes(t)) return false }
+  for(const c of colorSel){ if(!r.color_tags.includes(c)) return false }
+  if(query && !r.title.includes(query)) return false;
+  return true;
+}
+function chip(label,on,count,fn,swatch){
+  const b=document.createElement("button"); b.className="chip"+(on?" on":"");
+  b.innerHTML=(swatch?'<span class="swatch" style="background:'+swatch+'"></span>':"")+label+(count!=null?'<span class="n">'+count+'</span>':"");
+  b.onclick=fn; return b;
+}
+function renderCascade(){
+  const box=$("cascade"); box.innerHTML="";
+  const lab=document.createElement("div"); lab.className="rowlabel"; lab.textContent="风格"; box.appendChild(lab);
+  const row=document.createElement("div"); row.className="chips";
+  DATA.categories.filter(c=>!c.parent_id).forEach(top=>{
+    row.appendChild(chip(top.name, selTop===top.id, catRefCount(top.id), ()=>{ selTop = selTop===top.id?null:top.id; if(selTop!==top.id) selStyle=null; if(!selTop) selStyle=null; render(); }));
+  });
+  box.appendChild(row);
+  if(selTop){
+    const row2=document.createElement("div"); row2.className="chips"; row2.style.marginTop="6px";
+    DATA.categories.filter(c=>c.parent_id===selTop).forEach(st=>{
+      row2.appendChild(chip(st.name, selStyle===st.id, catRefCount(st.id), ()=>{ selStyle = selStyle===st.id?null:st.id; render(); }));
+    });
+    box.appendChild(row2);
+  }
+}
+function tagRow(title, vocab, selSet, isColor){
+  const wrap=document.createElement("div");
+  const row=document.createElement("div"); row.className="chips";
+  vocab.forEach(t=>{
+    const cnt=DATA.refs.filter(r=> isColor ? r.color_tags.includes(t) : r.tags.includes(t)).length;
+    if(!cnt) return;
+    row.appendChild(chip(t, selSet.has(t), cnt, ()=>{ selSet.has(t)?selSet.delete(t):selSet.add(t); render(); }, isColor?SWATCH[t]:null));
+  });
+  wrap.appendChild(row); return wrap;
+}
+function renderTags(){
+  const box=$("tagfilters"); box.innerHTML="";
+  const head=document.createElement("div"); head.className="rowlabel"; head.style.cursor="pointer";
+  head.textContent="标签筛选 "+(tagsOpen?"▾":"▸");
+  head.onclick=()=>{tagsOpen=!tagsOpen; renderTags()};
+  box.appendChild(head);
+  if(!tagsOpen) return;
+  [["题材",DATA.subject_tags,tagSel,false],["构图",DATA.craft_tags,tagSel,false],["色彩",DATA.color_names,colorSel,true]].forEach(([t,v,s,c])=>{
+    const l=document.createElement("div"); l.className="rowlabel"; l.textContent=t; box.appendChild(l);
+    box.appendChild(tagRow(t,v,s,c));
+  });
+}
+function card(r){
+  const d=document.createElement("div"); d.className="card";
+  const img=document.createElement("img"); img.src=r.image; img.alt=r.title; img.loading="lazy"; img.draggable=false;
+  const t=document.createElement("div"); t.className="t"; t.textContent=r.title;
+  d.appendChild(img); d.appendChild(t);
+  d.onclick=()=>openDetail(r.id);
+  return d;
+}
+function gridOf(list){
+  const g=document.createElement("div"); g.className="grid";
+  list.forEach(r=>g.appendChild(card(r))); return g;
+}
+function fold(key,title,count,level){
+  const wrap=document.createElement("div"); wrap.className="fold lv"+level;
+  const h=document.createElement("button"); h.className="foldhead";
+  const open=expanded.has(key);
+  h.innerHTML="<span>"+title+"</span><span><span class='cnt'>"+count+" 张</span> <span class='arrow'>"+(open?"▾":"▸")+"</span></span>";
+  h.onclick=()=>{ open?expanded.delete(key):expanded.add(key); render(); };
+  wrap.appendChild(h);
+  if(open){ const b=document.createElement("div"); b.className="foldbody"; wrap.appendChild(b); return [wrap,b]; }
+  return [wrap,null];
+}
+function render(){
+  renderCascade(); renderTags();
+  const content=$("content"); content.innerHTML="";
+  if(filtering()){
+    const list=DATA.refs.filter(matchRef);
+    currentList=list;
+    $("status").textContent="筛出 "+list.length+" 张（共 "+DATA.refs.length+" 张）";
+    if(!list.length){ content.innerHTML='<div class="empty">没有符合的图片，换个筛选试试。</div>'; return; }
+    content.appendChild(gridOf(list)); return;
+  }
+  $("status").textContent="全部 "+DATA.refs.length+" 张 · 已折叠，点标题展开";
+  DATA.categories.filter(c=>!c.parent_id).forEach(top=>{
+    const [fw,fb]=fold("top-"+top.id, top.name, catRefCount(top.id), 1);
+    content.appendChild(fw);
+    if(!fb) return;
+    DATA.categories.filter(c=>c.parent_id===top.id).forEach(st=>{
+      const stGroups=DATA.groups.filter(g=>g.category_id===st.id);
+      const stCount=DATA.refs.filter(r=>stGroups.some(g=>g.id===r.group_id)).length;
+      const [sw,sb]=fold("style-"+st.id, st.name, stCount, 2);
+      fb.appendChild(sw);
+      if(!sb) return;
+      stGroups.forEach(g=>{
+        const list=DATA.refs.filter(r=>r.group_id===g.id);
+        const [gw,gb]=fold("group-"+g.id, g.name, list.length, 3);
+        sb.appendChild(gw);
+        if(!gb) return;
+        if(g.description){ const d=document.createElement("div"); d.className="gdesc"; d.textContent=g.description; gb.appendChild(d); }
+        gb.appendChild(gridOf(list));
+        gb.querySelectorAll(".card").forEach((el,i)=>{ el.onclick=()=>{ currentList=list; openDetail(list[i].id); } });
+      });
+    });
+  });
+}
+function field(k,v){ return v? '<div class="field"><div class="k">'+k+'</div><div class="v">'+v.replace(/</g,"&lt;")+'</div></div>':"" }
+function openDetail(id){
+  let idx=currentList.findIndex(r=>r.id===id);
+  if(idx<0){ currentList=DATA.refs.filter(r=>r.group_id===refsById[id].group_id); idx=currentList.findIndex(r=>r.id===id); }
+  curIdx=idx; showDetail();
+  $("overlay").classList.add("open"); document.body.style.overflow="hidden";
+}
+function showDetail(){
+  const r=currentList[curIdx]; if(!r) return;
+  $("ovImg").src=r.image; $("ovImg").draggable=false;
+  $("ovPos").textContent=(curIdx+1)+" / "+currentList.length;
+  $("ovTitle").textContent=r.title;
+  $("ovStyle").textContent=(r.style_desc||"")+(r.style_name?"（"+r.style_name+"）":"");
+  let h="";
+  h+=field("第一眼",r.first_glance);
+  h+=field("故事点",r.story_point);
+  h+=field("构图",r.composition_note);
+  h+=field("光线",r.light_note);
+  h+=field("色彩",r.color_note);
+  h+=field("可复用",r.reusable_note);
+  const tags=r.tags.concat(r.color_tags||[]);
+  if(tags.length) h+='<div class="field"><div class="k">标签</div><div class="tagchips">'+tags.map(t=>"<span>"+t.replace(/</g,"&lt;")+"</span>").join("")+"</div></div>";
+  h+=field("出处",r.source_text);
+  $("ovFields").innerHTML=h;
+  $("overlay").scrollTop=0;
+}
+function step(d){ if(!currentList.length) return; curIdx=(curIdx+d+currentList.length)%currentList.length; showDetail(); }
+$("ovPrev").onclick=()=>step(-1);
+$("ovNext").onclick=()=>step(1);
+$("ovClose").onclick=()=>{ $("overlay").classList.remove("open"); document.body.style.overflow=""; };
+document.addEventListener("keydown",e=>{
+  if(!$("overlay").classList.contains("open")) return;
+  if(e.key==="ArrowLeft") step(-1); if(e.key==="ArrowRight") step(1); if(e.key==="Escape") $("ovClose").click();
+});
+let tx=null;
+$("overlay").addEventListener("touchstart",e=>{tx=e.touches[0].clientX},{passive:true});
+$("overlay").addEventListener("touchend",e=>{
+  if(tx==null) return; const dx=e.changedTouches[0].clientX-tx;
+  if(Math.abs(dx)>50) step(dx<0?1:-1); tx=null;
+},{passive:true});
+document.addEventListener("contextmenu",e=>{ if(e.target.tagName==="IMG") e.preventDefault(); });
+$("q").addEventListener("input",e=>{ query=e.target.value.trim(); render(); });
+$("clearBtn").onclick=()=>{ selTop=null; selStyle=null; tagSel.clear(); colorSel.clear(); query=""; $("q").value=""; expanded.clear(); render(); };
+fetch("data.json").then(r=>r.json()).then(d=>{
+  DATA=d;
+  d.refs.forEach(r=>refsById[r.id]=r);
+  d.groups.forEach(g=>groupsById[g.id]=g);
+  d.categories.forEach(c=>catsById[c.id]=c);
+  $("subtitle").textContent="共 "+d.refs.length+" 张参考图 · 按总类 / 大风格 / 图组三层整理 · 点开标题逐层展开，或用筛选直接找图";
+  render();
+}).catch(()=>{ $("subtitle").textContent="数据加载失败，请刷新重试。"; });
+</script>
+</body>
+</html>
